@@ -40,7 +40,7 @@
     "node": ">=10"
   },
   "dependencies": {
-    "@relaycorp/relaynet-core": "^1.48.0",
+    "@relaycorp/relaynet-core": "^1.48.2",
     "axios": "^0.21.1",
     "buffer-to-arraybuffer": "0.0.6",
     "it-pipe": "^1.1.0",

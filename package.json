@@ -40,19 +40,19 @@
     "node": ">=10"
   },
   "dependencies": {
-    "@relaycorp/relaynet-core": "^1.48.0",
+    "@relaycorp/relaynet-core": "^1.49.1",
     "axios": "^0.21.1",
     "buffer-to-arraybuffer": "0.0.6",
     "it-pipe": "^1.1.0",
     "stream-to-it": "^0.2.4",
     "verror": "^1.10.0",
-    "ws": "^7.5.0"
+    "ws": "^7.5.3"
   },
   "devDependencies": {
     "@relaycorp/relaynet-testing": "^1.3.0",
     "@relaycorp/shared-config": "^1.5.3",
     "@relaycorp/ws-mock": "^2.4.1",
-    "@types/jest": "^26.0.23",
+    "@types/jest": "^26.0.24",
     "@types/verror": "^1.10.5",
     "@types/ws": "^7.4.1",
     "axios-mock-adapter": "^1.19.0",
@@ -62,7 +62,7 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^2.3.2",
     "ts-jest": "^27.0.3",
-    "ts-node": "^10.0.0",
+    "ts-node": "^10.1.0",
     "tslint": "^5.20.1",
     "typedoc": "^0.20.37",
     "typescript": "^3.9.10"

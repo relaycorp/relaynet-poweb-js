@@ -296,7 +296,7 @@ export class PoWebClient implements GSCClient {
       ws.once('message', async (message) => {
         let challenge: HandshakeChallenge;
         try {
-          challenge = HandshakeChallenge.deserialize(bufferToArray(message));
+          challenge = HandshakeChallenge.deserialize(bufferToArray(message as Buffer));
         } catch (error) {
           ws.close(WebSocketCode.CANNOT_ACCEPT, 'Malformed handshake challenge');
           reject(

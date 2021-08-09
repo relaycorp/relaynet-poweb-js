@@ -1,20 +1,9 @@
-src
-docs/
-build/
+*
 
-jest.*.js
+!build/main/lib/**
+!build/module/lib/**
 **/*.spec.*
-_test_utils.*
-coverage/
 
-tsconfig*.json
-tslint.json
-.prettierignore
-.editorconfig
-.releaserc.yml
-
-.vscode/
-.idea/
-
-.github/
-.dependabot/
+!package.json
+!LICENSE
+!README.md

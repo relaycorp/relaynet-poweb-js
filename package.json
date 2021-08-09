@@ -6,7 +6,7 @@
     "name": "Relaycorp, Inc.",
     "url": "https://relaycorp.tech/"
   },
-  "description": "Relaynet PoWeb binding",
+  "description": "Awala PoWeb binding",
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",
   "module": "build/module/index.js",
@@ -14,7 +14,7 @@
   "homepage": "https://docs.relaycorp.tech/relaynet-poweb-js/",
   "license": "MIT",
   "keywords": [
-    "relaynet"
+    "awala"
   ],
   "scripts": {
     "build": "run-s clean && run-p build:*",

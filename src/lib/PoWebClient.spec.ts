@@ -1040,6 +1040,16 @@ describe('collectParcels', () => {
       expect(ackReceiver.message).toEqual(deliveryId);
     });
   });
+
+  describe('Pings', () => {
+    test.todo('Connection should be terminated if first ping is not received within 7s', async () => {
+
+    });
+
+    test.todo('Connection should be terminated if a subsequent ping is not received within 7s');
+
+    test.todo('Connection should be kept open if pings are received every < 7 seconds');
+  });
 });
 
 async function getRejection(promise: Promise<any>): Promise<Error> {

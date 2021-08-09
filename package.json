@@ -37,7 +37,7 @@
     "clean": "del-cli build test"
   },
   "engines": {
-    "node": ">=10"
+    "node": ">=12"
   },
   "dependencies": {
     "@relaycorp/relaynet-core": "^1.49.1",

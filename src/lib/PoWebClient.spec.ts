@@ -1042,9 +1042,7 @@ describe('collectParcels', () => {
   });
 
   describe('Pings', () => {
-    test.todo('Connection should be terminated if first ping is not received within 7s', async () => {
-
-    });
+    test.todo('Connection should be terminated if first ping is not received within 7s');
 
     test.todo('Connection should be terminated if a subsequent ping is not received within 7s');
 

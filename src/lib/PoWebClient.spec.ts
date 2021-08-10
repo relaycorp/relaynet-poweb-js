@@ -55,6 +55,7 @@ import {
   PNRA_CONTENT_TYPE,
   PNRR_CONTENT_TYPE,
   PoWebClient,
+  WEBSOCKET_PING_TIMEOUT_MS,
 } from './PoWebClient';
 
 let nodeKeyPairs: NodeKeyPairSet;
@@ -932,11 +933,89 @@ describe('collectParcels', () => {
   });
 
   describe('Pings', () => {
-    test.todo('Connection should be terminated if first ping is not received within 7s');
+    beforeEach(() => {
+      jest.useFakeTimers('legacy');
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
 
     test.todo('Connection should be terminated if a subsequent ping is not received within 7s');
 
     test.todo('Connection should be kept open if pings are received every < 7 seconds');
+
+    describe('Before handshake completes', () => {
+      test('Error should be thrown if ping not received on time and connection is not Keep Alive', async () => {
+        const client = PoWebClient.initLocal();
+
+        const error = await getPromiseRejection(
+          mockServer.use(
+            asyncIterableToArray(
+              client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
+            ),
+            async () => {
+              jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS + 100);
+
+              expect(mockServer.client.wasTerminated).toBeTrue();
+            },
+          ),
+        );
+
+        expect(error).toBeInstanceOf(ServerError);
+        expect(error.message).toEqual('Lost connection before completing handshake');
+      });
+
+      test.todo(
+        'Reconnection should be attempted if ping not received on time and connection is Keep Alive',
+      );
+    });
+
+    describe('After handshake', () => {
+      test('Error should be thrown if ping not received on time and connection is not Keep Alive', async () => {
+        const client = PoWebClient.initLocal();
+
+        const error = await getPromiseRejection(
+          mockServer.useWithHandshake(
+            asyncIterableToArray(
+              client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
+            ),
+            async () => {
+              jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS + 100);
+
+              expect(mockServer.client.wasTerminated).toBeTrue();
+            },
+          ),
+        );
+
+        expect(error).toBeInstanceOf(ServerError);
+        expect(error.message).toMatch(/^Connection error:/);
+        expect((error as ServerError).cause()?.message).toEqual('Ping timeout');
+      });
+
+      test('Reconnection should be attempted if ping not received on time and connection is Keep Alive', async () => {
+        const mockServer2 = makeMockServer();
+        const parcelSerialized = Buffer.from('parcel1');
+        const client = PoWebClient.initLocal();
+
+        await Promise.all([
+          asyncIterableToArray(
+            iterableTake(client.collectParcels([nonceSigner], StreamingMode.KEEP_ALIVE), 1),
+          ),
+          (async () => {
+            await mockServer.useWithHandshake(new Promise(setImmediate), async () => {
+              jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS + 100);
+
+              expect(mockServer.client.wasTerminated);
+            });
+
+            await mockServer2.useWithHandshake(Promise.resolve(), async () => {
+              await mockServer2.sendParcelDelivery(bufferToArray(parcelSerialized), 'id');
+              await mockServer2.waitForPeerClosure();
+            });
+          })(),
+        ]);
+      });
+    });
   });
 
   function makeMockServer(): ParcelCollectionMockServer {

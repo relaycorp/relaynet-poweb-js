@@ -11,6 +11,7 @@ import {
   Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
+import AbortController, { AbortSignal } from 'abort-controller';
 import axios, { AxiosInstance } from 'axios';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { createHash } from 'crypto';
@@ -37,6 +38,9 @@ const DEFAULT_LOCAL_TIMEOUT_MS = 3_000;
 const DEFAULT_REMOTE_TIMEOUT_MS = 5_000;
 
 const OCTETS_IN_ONE_MIB = 2 ** 20;
+
+const WEBSOCKET_PING_TIMEOUT_SECONDS = 7;
+export const WEBSOCKET_PING_TIMEOUT_MS = WEBSOCKET_PING_TIMEOUT_SECONDS * 1_000;
 
 export const PNRA_CONTENT_TYPE = 'application/vnd.awala.node-registration.authorization';
 export const PNRR_CONTENT_TYPE = 'application/vnd.awala.node-registration.request';
@@ -233,7 +237,14 @@ export class PoWebClient implements GSCClient {
       stateManager.registerConnectionError(error);
     });
 
-    await this.doHandshake(ws, nonceSigners);
+    const pingTimeoutSignal = monitorPingTimeout(ws);
+    pingTimeoutSignal.addEventListener('abort', () => {
+      if (streamingMode === StreamingMode.CLOSE_UPON_COMPLETION) {
+        stateManager.registerConnectionError(new ServerError('Ping timeout'));
+      }
+    });
+
+    await this.doHandshake(ws, nonceSigners, pingTimeoutSignal);
     handshakeCallback?.();
 
     const incomingDeliveries = source(createWebSocketStream(ws));
@@ -270,13 +281,19 @@ export class PoWebClient implements GSCClient {
     } finally {
       stateManager.throwConnectionErrorIfAny();
 
-      ws.close(stateManager.clientCloseFrame.code, stateManager.clientCloseFrame.reason);
+      if (ws.readyState === ws.OPEN) {
+        ws.close(stateManager.clientCloseFrame.code, stateManager.clientCloseFrame.reason);
+      }
 
       stateManager.throwClientErrorIfAny();
     }
   }
 
-  private async doHandshake(ws: WebSocket, nonceSigners: readonly Signer[]): Promise<void> {
+  private async doHandshake(
+    ws: WebSocket,
+    nonceSigners: readonly Signer[],
+    pingTimeoutSignal: AbortSignal,
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       function rejectPrematureClose(): void {
         reject(
@@ -286,6 +303,11 @@ export class PoWebClient implements GSCClient {
         );
       }
       ws.once('close', rejectPrematureClose);
+
+      function rejectPingTimeout(): void {
+        reject(new ServerError('Lost connection before completing handshake'));
+      }
+      pingTimeoutSignal.addEventListener('abort', rejectPingTimeout);
 
       function wrapConnectionError(error: Error): void {
         reject(new ServerError(error, 'Got connection error before/during the handshake'));
@@ -316,9 +338,30 @@ export class PoWebClient implements GSCClient {
         resolve();
         ws.removeListener('close', rejectPrematureClose);
         ws.removeListener('error', wrapConnectionError);
+        pingTimeoutSignal.removeEventListener('abort', rejectPingTimeout);
       });
     });
   }
+}
+
+function monitorPingTimeout(ws: WebSocket): AbortSignal {
+  const abortController = new AbortController();
+
+  const setPingTimeout = () => {
+    return setTimeout(() => {
+      ws.terminate();
+      abortController.abort();
+    }, WEBSOCKET_PING_TIMEOUT_MS);
+  };
+
+  let timeoutId = setPingTimeout();
+  ws.once('ping', () => {
+    clearTimeout(timeoutId);
+
+    timeoutId = setPingTimeout();
+  });
+
+  return abortController.signal;
 }
 
 function sha256Hex(plaintext: Buffer): string {

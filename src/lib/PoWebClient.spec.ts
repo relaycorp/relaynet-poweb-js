@@ -35,6 +35,7 @@ import {
 } from './_test_utils';
 import { WebSocketCode } from './_websocketUtils';
 import {
+  ConnectionTimeoutError,
   InvalidHandshakeChallengeError,
   NonceSignerError,
   ParcelDeliveryError,
@@ -940,9 +941,51 @@ describe('collectParcels', () => {
       jest.useRealTimers();
     });
 
-    test.todo('Connection should be terminated if a subsequent ping is not received within 7s');
+    test('Connection should be terminated if a subsequent ping is not received within 7s', async () => {
+      const client = PoWebClient.initLocal();
 
-    test.todo('Connection should be kept open if pings are received every < 7 seconds');
+      const error = await getPromiseRejection(
+        mockServer.useWithHandshake(
+          asyncIterableToArray(
+            client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
+          ),
+          async () => {
+            jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS - 100);
+
+            mockServer.ping();
+            jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS + 1);
+          },
+        ),
+      );
+
+      expect(mockServer.client.wasTerminated).toBeTrue();
+
+      expect(error).toBeInstanceOf(ServerError);
+      expect(error.message).toMatch(/^Connection error:/);
+      expect((error as ServerError).cause()?.message).toEqual('Ping timeout');
+    });
+
+    test('Connection should be kept open if pings are received every < 7 seconds', async () => {
+      const client = PoWebClient.initLocal();
+
+      await mockServer.useWithHandshake(
+        asyncIterableToArray(
+          client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
+        ),
+        async () => {
+          jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS - 100);
+          mockServer.ping();
+
+          jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS - 100);
+          mockServer.ping();
+
+          jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS - 100);
+          mockServer.ping();
+        },
+      );
+
+      expect(mockServer.client.wasTerminated).toBeFalse();
+    });
 
     describe('Before handshake completes', () => {
       test('Error should be thrown if ping not received on time and connection is not Keep Alive', async () => {
@@ -961,13 +1004,34 @@ describe('collectParcels', () => {
           ),
         );
 
-        expect(error).toBeInstanceOf(ServerError);
+        expect(error).toBeInstanceOf(ConnectionTimeoutError);
         expect(error.message).toEqual('Lost connection before completing handshake');
       });
 
-      test.todo(
-        'Reconnection should be attempted if ping not received on time and connection is Keep Alive',
-      );
+      test('Reconnection should be attempted if ping not received on time and connection is Keep Alive', async () => {
+        const mockServer2 = makeMockServer();
+        const parcelSerialized = Buffer.from('parcel1');
+        const client = PoWebClient.initLocal();
+
+        await Promise.all([
+          asyncIterableToArray(
+            iterableTake(client.collectParcels([nonceSigner], StreamingMode.KEEP_ALIVE), 1),
+          ),
+          (async () => {
+            // First session won't get past the handshake:
+            await mockServer.use(new Promise(setImmediate), async () => {
+              jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS + 100);
+
+              expect(mockServer.client.wasTerminated);
+            });
+
+            await mockServer2.useWithHandshake(Promise.resolve(), async () => {
+              await mockServer2.sendParcelDelivery(bufferToArray(parcelSerialized), 'id');
+              await mockServer2.waitForPeerClosure();
+            });
+          })(),
+        ]);
+      });
     });
 
     describe('After handshake', () => {
@@ -989,6 +1053,7 @@ describe('collectParcels', () => {
 
         expect(error).toBeInstanceOf(ServerError);
         expect(error.message).toMatch(/^Connection error:/);
+        expect((error as ServerError).cause()).toBeInstanceOf(ConnectionTimeoutError);
         expect((error as ServerError).cause()?.message).toEqual('Ping timeout');
       });
 

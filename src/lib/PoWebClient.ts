@@ -24,6 +24,7 @@ import WebSocket, { createWebSocketStream } from 'ws';
 
 import { WebSocketCode, WebSocketStateManager } from './_websocketUtils';
 import {
+  ConnectionTimeoutError,
   InvalidHandshakeChallengeError,
   NonceSignerError,
   ParcelDeliveryError,
@@ -239,12 +240,21 @@ export class PoWebClient implements GSCClient {
 
     const pingTimeoutSignal = monitorPingTimeout(ws);
     pingTimeoutSignal.addEventListener('abort', () => {
+      ws.terminate();
+
       if (streamingMode === StreamingMode.CLOSE_UPON_COMPLETION) {
-        stateManager.registerConnectionError(new ServerError('Ping timeout'));
+        stateManager.registerConnectionError(new ConnectionTimeoutError('Ping timeout'));
       }
     });
 
-    await this.doHandshake(ws, nonceSigners, pingTimeoutSignal);
+    try {
+      await this.doHandshake(ws, nonceSigners, pingTimeoutSignal);
+    } catch (err) {
+      if (err instanceof ConnectionTimeoutError && streamingMode === StreamingMode.KEEP_ALIVE) {
+        return;
+      }
+      throw err;
+    }
     handshakeCallback?.();
 
     const incomingDeliveries = source(createWebSocketStream(ws));
@@ -305,7 +315,7 @@ export class PoWebClient implements GSCClient {
       ws.once('close', rejectPrematureClose);
 
       function rejectPingTimeout(): void {
-        reject(new ServerError('Lost connection before completing handshake'));
+        reject(new ConnectionTimeoutError('Lost connection before completing handshake'));
       }
       pingTimeoutSignal.addEventListener('abort', rejectPingTimeout);
 
@@ -349,16 +359,19 @@ function monitorPingTimeout(ws: WebSocket): AbortSignal {
 
   const setPingTimeout = () => {
     return setTimeout(() => {
-      ws.terminate();
       abortController.abort();
     }, WEBSOCKET_PING_TIMEOUT_MS);
   };
 
-  let timeoutId = setPingTimeout();
-  ws.once('ping', () => {
-    clearTimeout(timeoutId);
+  let pingTimeout = setPingTimeout();
+  ws.on('ping', () => {
+    clearTimeout(pingTimeout);
 
-    timeoutId = setPingTimeout();
+    pingTimeout = setPingTimeout();
+  });
+
+  ws.once('close', () => {
+    clearTimeout(pingTimeout);
   });
 
   return abortController.signal;

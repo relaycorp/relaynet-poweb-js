@@ -279,7 +279,6 @@ export class PoWebClient implements GSCClient {
   private async doHandshake(ws: WebSocket, nonceSigners: readonly Signer[]): Promise<void> {
     return new Promise((resolve, reject) => {
       function rejectPrematureClose(): void {
-        ws.close(WebSocketCode.NORMAL);
         reject(
           new InvalidHandshakeChallengeError(
             'Server closed the connection before/during the handshake',

@@ -1,7 +1,8 @@
 *
 
-!build/main/lib/**
-!build/module/lib/**
+!build/main/**
+!build/module/**
+build/*/integration_tests/**
 **/*.spec.*
 
 !package.json

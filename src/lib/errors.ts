@@ -10,6 +10,7 @@ export abstract class PoWebError extends VError {
 
 export class ClientError extends PoWebError {}
 export class ServerError extends PoWebError {}
+export class ConnectionTimeoutError extends PoWebError {}
 
 export class ParcelDeliveryError extends PoWebError {}
 

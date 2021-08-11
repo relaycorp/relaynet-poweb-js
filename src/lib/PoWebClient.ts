@@ -325,6 +325,10 @@ export class PoWebClient implements GSCClient {
       ws.once('error', wrapConnectionError);
 
       ws.once('message', async (message) => {
+        ws.removeListener('close', rejectPrematureClose);
+        ws.removeListener('error', wrapConnectionError);
+        pingTimeoutSignal.removeEventListener('abort', rejectPingTimeout);
+
         let challenge: HandshakeChallenge;
         try {
           challenge = HandshakeChallenge.deserialize(bufferToArray(message as Buffer));
@@ -346,9 +350,6 @@ export class PoWebClient implements GSCClient {
         ws.send(Buffer.from(response.serialize()));
 
         resolve();
-        ws.removeListener('close', rejectPrematureClose);
-        ws.removeListener('error', wrapConnectionError);
-        pingTimeoutSignal.removeEventListener('abort', rejectPingTimeout);
       });
     });
   }

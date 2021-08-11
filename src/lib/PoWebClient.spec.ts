@@ -535,6 +535,7 @@ describe('collectParcels', () => {
       const error = await getPromiseRejection(
         mockServer.use(asyncIterableToArray(client.collectParcels([nonceSigner])), async () => {
           await mockServer.send('malformed');
+          await mockServer.waitForPeerClosure();
         }),
       );
 
@@ -624,11 +625,7 @@ describe('collectParcels', () => {
         client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
       ),
       async () => {
-        mockServer.close(WebSocketCode.NO_STATUS);
-
-        await expect(mockServer.waitForPeerClosure()).resolves.toEqual({
-          code: WebSocketCode.NORMAL,
-        });
+        mockServer.close();
       },
     );
   });
@@ -651,10 +648,6 @@ describe('collectParcels', () => {
       'Server closed connection unexpectedly ' +
         `(code: ${WebSocketCode.VIOLATED_POLICY}, reason: ${closeReason})`,
     );
-
-    await expect(mockServer.waitForPeerClosure()).resolves.toEqual({
-      code: WebSocketCode.NORMAL,
-    });
   });
 
   test('Connection error should be rethrown', async () => {
@@ -697,23 +690,6 @@ describe('collectParcels', () => {
     expect(mockServer.peerCloseFrame).toEqual<CloseFrame>({
       code: WebSocketCode.CANNOT_ACCEPT,
       reason: 'Malformed parcel delivery',
-    });
-  });
-
-  test('Getting a 1005 close code should close the connection normally', async () => {
-    const client = PoWebClient.initLocal();
-
-    await mockServer.useWithHandshake(
-      asyncIterableToArray(
-        client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
-      ),
-      async () => {
-        mockServer.close(WebSocketCode.NO_STATUS);
-      },
-    );
-
-    await expect(mockServer.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-      code: WebSocketCode.NORMAL,
     });
   });
 

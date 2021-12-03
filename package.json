@@ -53,7 +53,7 @@
     "@relaycorp/relaynet-testing": "^1.3.0",
     "@relaycorp/shared-config": "^1.6.0",
     "@relaycorp/ws-mock": "^4.2.0",
-    "@types/jest": "^26.0.24",
+    "@types/jest": "^27.0.3",
     "@types/verror": "^1.10.5",
     "@types/ws": "^7.4.7",
     "axios-mock-adapter": "^1.20.0",
@@ -63,7 +63,7 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^2.5.0",
     "ts-jest": "^27.0.4",
-    "ts-node": "^10.2.0",
+    "ts-node": "^10.4.0",
     "tslint": "^5.20.1",
     "typedoc": "^0.20.37",
     "typescript": "^3.9.10"

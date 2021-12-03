@@ -1,4 +1,5 @@
-name: "Validate PR title"
+name: Process PRs
+
 on:
   pull_request:
     types:
@@ -7,6 +8,11 @@ on:
       - synchronize
 
 jobs:
+  dependabot:
+    uses: relaycorp/shared-workflows/.github/workflows/prs.yml@main
+    secrets:
+      dependabotPAT: ${{ secrets.IRELAYBOT_PAT_PR_AUTOMATION }}
+
   action-semantic-pull-request:
     runs-on: ubuntu-latest
     steps:

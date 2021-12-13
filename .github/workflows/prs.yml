@@ -8,14 +8,7 @@ on:
       - synchronize
 
 jobs:
-  dependabot:
-    uses: relaycorp/shared-workflows/.github/workflows/prs.yml@main
+  pr-ci:
+    uses: relaycorp/shared-workflows/.github/workflows/pr-ci.yml@main
     secrets:
       dependabotPAT: ${{ secrets.IRELAYBOT_PAT_PR_AUTOMATION }}
-
-  action-semantic-pull-request:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: amannn/action-semantic-pull-request@v3.4.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

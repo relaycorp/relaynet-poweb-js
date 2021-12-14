@@ -10,5 +10,3 @@ on:
 jobs:
   pr-ci:
     uses: relaycorp/shared-workflows/.github/workflows/pr-ci.yml@main
-    secrets:
-      dependabotPAT: ${{ secrets.IRELAYBOT_PAT_PR_AUTOMATION }}

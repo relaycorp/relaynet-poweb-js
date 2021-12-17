@@ -4,11 +4,11 @@ on:
   push:
     branches: [ master ]
 jobs:
-  nodejs-lib-ci:
+  lib-ci:
     uses: relaycorp/shared-workflows/.github/workflows/nodejs-lib-ci.yml@main
 
   release:
-    needs: nodejs-lib-ci
+    needs: lib-ci
     uses: relaycorp/shared-workflows/.github/workflows/nodejs-lib-release.yml@main
     with:
       jekyll_docs: true

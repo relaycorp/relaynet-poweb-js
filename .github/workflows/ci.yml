@@ -7,16 +7,16 @@ jobs:
   nodejs-lib-ci:
     uses: relaycorp/shared-workflows/.github/workflows/nodejs-lib-ci.yml@main
 
-  ci:
-    needs: nodejs-lib-ci
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo Success
-
   release:
-    needs: ci
+    needs: nodejs-lib-ci
     uses: relaycorp/shared-workflows/.github/workflows/nodejs-lib-release.yml@main
     with:
       jekyll_docs: true
     secrets:
       npm_token: ${{ secrets.NPM_TOKEN }}
+
+  ci:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo Success

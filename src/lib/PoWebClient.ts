@@ -162,7 +162,7 @@ export class PoWebClient implements GSCClient {
 
     const registrationSerialized = bufferToArray(response.data);
     try {
-      return PrivateNodeRegistration.deserialize(registrationSerialized);
+      return await PrivateNodeRegistration.deserialize(registrationSerialized);
     } catch (exc) {
       throw new ServerError(exc, 'Malformed registration received');
     }

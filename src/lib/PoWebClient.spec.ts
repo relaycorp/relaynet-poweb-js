@@ -272,7 +272,7 @@ describe('registerNode', () => {
       certificationPath.privateGateway,
       certificationPath.publicGateway,
     );
-    expectedRegistrationSerialized = Buffer.from(expectedRegistration.serialize());
+    expectedRegistrationSerialized = Buffer.from(await expectedRegistration.serialize());
   });
 
   test('PNRA should be POSTed to /v1/nodes', async () => {

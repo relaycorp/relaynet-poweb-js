@@ -15,7 +15,7 @@ import {
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import {
-  generateNodeKeyPairSet,
+  generateIdentityKeyPairSet,
   generatePDACertificationPath,
   NodeKeyPairSet,
   PDACertPath,
@@ -62,7 +62,7 @@ import {
 let nodeKeyPairs: NodeKeyPairSet;
 let certificationPath: PDACertPath;
 beforeAll(async () => {
-  nodeKeyPairs = await generateNodeKeyPairSet();
+  nodeKeyPairs = await generateIdentityKeyPairSet();
   certificationPath = await generatePDACertificationPath(nodeKeyPairs);
 });
 

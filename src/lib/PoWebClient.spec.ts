@@ -2,16 +2,18 @@
 
 import {
   derSerializePublicKey,
-  DETACHED_SIGNATURE_TYPES,
   generateRSAKeyPair,
   HandshakeChallenge,
   HandshakeResponse,
   issueEndpointCertificate,
   MAX_RAMF_MESSAGE_LENGTH,
   ParcelCollection,
+  ParcelCollectionHandshakeSigner,
+  ParcelCollectionHandshakeVerifier,
   ParcelDelivery,
+  ParcelDeliverySigner,
+  ParcelDeliveryVerifier,
   PrivateNodeRegistration,
-  Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import {
@@ -341,9 +343,14 @@ describe('registerNode', () => {
 
 describe('deliverParcel', () => {
   const parcelSerialized = bufferToArray(Buffer.from('I am a "parcel"'));
-  let signer: Signer;
+  let signer: ParcelDeliverySigner;
+  let verifier: ParcelDeliveryVerifier;
   beforeAll(async () => {
-    signer = new Signer(certificationPath.privateGateway, nodeKeyPairs.privateGateway.privateKey);
+    signer = new ParcelDeliverySigner(
+      certificationPath.privateGateway,
+      nodeKeyPairs.privateGateway.privateKey,
+    );
+    verifier = new ParcelDeliveryVerifier([certificationPath.publicGateway]);
   });
 
   let client: PoWebClient;
@@ -376,11 +383,7 @@ describe('deliverParcel', () => {
     expect(authorizationHeaderValue).toStartWith('Relaynet-Countersignature ');
     const [, countersignatureBase64] = authorizationHeaderValue.split(' ', 2);
     const countersignature = Buffer.from(countersignatureBase64, 'base64');
-    await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.verify(
-      bufferToArray(countersignature),
-      parcelSerialized,
-      [certificationPath.publicGateway],
-    );
+    await verifier.verify(bufferToArray(countersignature), parcelSerialized);
   });
 
   test('HTTP 20X should be regarded a successful delivery', async () => {
@@ -442,9 +445,9 @@ describe('collectParcels', () => {
 
   const NONCE = bufferToArray(Buffer.from('the-nonce'));
 
-  let nonceSigner: Signer;
+  let signer: ParcelCollectionHandshakeSigner;
   beforeAll(async () => {
-    nonceSigner = new Signer(
+    signer = new ParcelCollectionHandshakeSigner(
       certificationPath.privateEndpoint,
       nodeKeyPairs.privateEndpoint.privateKey,
     );
@@ -460,7 +463,7 @@ describe('collectParcels', () => {
     const client = PoWebClient.initLocal();
 
     await mockServer.use(
-      asyncIterableToArray(client.collectParcels([nonceSigner])).catch(() => undefined),
+      asyncIterableToArray(client.collectParcels([signer])).catch(() => undefined),
     );
 
     expect(WebSocket).toBeCalledWith(
@@ -473,7 +476,7 @@ describe('collectParcels', () => {
     const client = PoWebClient.initLocal();
 
     await mockServer.use(
-      asyncIterableToArray(client.collectParcels([nonceSigner])).catch(() => undefined),
+      asyncIterableToArray(client.collectParcels([signer])).catch(() => undefined),
     );
 
     expect(WebSocket).toBeCalledWith(ENDPOINT_URL.toString(), expect.anything());
@@ -494,7 +497,7 @@ describe('collectParcels', () => {
       const client = PoWebClient.initLocal();
 
       const error = await getPromiseRejection(
-        mockServer.use(asyncIterableToArray(client.collectParcels([nonceSigner]))),
+        mockServer.use(asyncIterableToArray(client.collectParcels([signer]))),
       );
 
       expect(error).toBeInstanceOf(InvalidHandshakeChallengeError);
@@ -505,7 +508,7 @@ describe('collectParcels', () => {
       const client = PoWebClient.initLocal();
 
       const error = await getPromiseRejection(
-        mockServer.use(asyncIterableToArray(client.collectParcels([nonceSigner]))),
+        mockServer.use(asyncIterableToArray(client.collectParcels([signer]))),
       );
 
       expect(error).toBeInstanceOf(InvalidHandshakeChallengeError);
@@ -517,7 +520,7 @@ describe('collectParcels', () => {
       const originalError = new Error('Something went wrong');
 
       const error = await getPromiseRejection(
-        mockServer.use(asyncIterableToArray(client.collectParcels([nonceSigner])), async () => {
+        mockServer.use(asyncIterableToArray(client.collectParcels([signer])), async () => {
           mockServer.abort(originalError);
         }),
       );
@@ -533,7 +536,7 @@ describe('collectParcels', () => {
       const client = PoWebClient.initLocal();
 
       const error = await getPromiseRejection(
-        mockServer.use(asyncIterableToArray(client.collectParcels([nonceSigner])), async () => {
+        mockServer.use(asyncIterableToArray(client.collectParcels([signer])), async () => {
           await mockServer.send('malformed');
           await mockServer.waitForPeerClosure();
         }),
@@ -552,9 +555,7 @@ describe('collectParcels', () => {
       const client = PoWebClient.initLocal();
 
       await mockServer.use(
-        asyncIterableToArray(
-          client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
-        ),
+        asyncIterableToArray(client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION)),
         async () => {
           const challenge = new HandshakeChallenge(NONCE);
           await mockServer.send(challenge.serialize());
@@ -563,9 +564,10 @@ describe('collectParcels', () => {
           const response = HandshakeResponse.deserialize(bufferToArray(responseRaw as Buffer));
           expect(response.nonceSignatures).toHaveLength(1);
 
-          await DETACHED_SIGNATURE_TYPES.NONCE.verify(response.nonceSignatures[0], NONCE, [
+          const verifier = new ParcelCollectionHandshakeVerifier([
             certificationPath.privateGateway,
           ]);
+          await verifier.verify(response.nonceSignatures[0], NONCE);
         },
       );
     });
@@ -578,7 +580,7 @@ describe('collectParcels', () => {
         await expect(
           mockServer.use(
             asyncIterableToArray(
-              client.collectParcels([nonceSigner], StreamingMode.KEEP_ALIVE, handshakeCallback),
+              client.collectParcels([signer], StreamingMode.KEEP_ALIVE, handshakeCallback),
             ),
           ),
         ).toReject();
@@ -592,11 +594,7 @@ describe('collectParcels', () => {
 
         await mockServer.useWithHandshake(
           asyncIterableToArray(
-            client.collectParcels(
-              [nonceSigner],
-              StreamingMode.CLOSE_UPON_COMPLETION,
-              handshakeCallback,
-            ),
+            client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION, handshakeCallback),
           ),
         );
 
@@ -609,9 +607,7 @@ describe('collectParcels', () => {
     const client = PoWebClient.initLocal();
 
     const parcelCollections = await mockServer.useWithHandshake(
-      asyncIterableToArray(
-        client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
-      ),
+      asyncIterableToArray(client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION)),
     );
 
     expect(parcelCollections).toHaveLength(0);
@@ -621,9 +617,7 @@ describe('collectParcels', () => {
     const client = PoWebClient.initLocal();
 
     await mockServer.useWithHandshake(
-      asyncIterableToArray(
-        client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
-      ),
+      asyncIterableToArray(client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION)),
       async () => {
         mockServer.close();
       },
@@ -636,7 +630,7 @@ describe('collectParcels', () => {
 
     const error = await getPromiseRejection(
       mockServer.useWithHandshake(
-        asyncIterableToArray(client.collectParcels([nonceSigner])),
+        asyncIterableToArray(client.collectParcels([signer])),
         async () => {
           mockServer.close(WebSocketCode.VIOLATED_POLICY, closeReason);
         },
@@ -656,7 +650,7 @@ describe('collectParcels', () => {
 
     const error = await getPromiseRejection(
       mockServer.useWithHandshake(
-        asyncIterableToArray(client.collectParcels([nonceSigner])),
+        asyncIterableToArray(client.collectParcels([signer])),
         async () => {
           mockServer.abort(originalError);
         },
@@ -675,7 +669,7 @@ describe('collectParcels', () => {
 
     const error = await getPromiseRejection(
       mockServer.useWithHandshake(
-        asyncIterableToArray(client.collectParcels([nonceSigner])),
+        asyncIterableToArray(client.collectParcels([signer])),
         async () => {
           await mockServer.send(Buffer.from('this is not a valid parcel delivery'));
           await mockServer.waitForPeerClosure();
@@ -697,7 +691,7 @@ describe('collectParcels', () => {
     const client = PoWebClient.initLocal();
 
     const parcelCollections = await mockServer.useWithHandshake(
-      asyncIterableToArray(iterableTake(client.collectParcels([nonceSigner]), 1)),
+      asyncIterableToArray(iterableTake(client.collectParcels([signer]), 1)),
       async () => {
         await mockServer.sendParcelDelivery(new ArrayBuffer(0), 'id1');
         await mockServer.sendParcelDelivery(new ArrayBuffer(0), 'id2');
@@ -717,7 +711,7 @@ describe('collectParcels', () => {
       const client = PoWebClient.initLocal();
 
       await mockServer.useWithHandshake(
-        asyncIterableToArray(client.collectParcels([nonceSigner])).catch(() => undefined),
+        asyncIterableToArray(client.collectParcels([signer])).catch(() => undefined),
       );
 
       expect(WebSocket).toBeCalledWith(
@@ -733,7 +727,7 @@ describe('collectParcels', () => {
 
       await mockServer.useWithHandshake(
         asyncIterableToArray(
-          client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
+          client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION),
         ).catch(() => undefined),
       );
 
@@ -755,7 +749,7 @@ describe('collectParcels', () => {
 
       const [parcelCollections] = await Promise.all([
         asyncIterableToArray(
-          iterableTake(client.collectParcels([nonceSigner], StreamingMode.KEEP_ALIVE), 2),
+          iterableTake(client.collectParcels([signer], StreamingMode.KEEP_ALIVE), 2),
         ),
         (async () => {
           await mockServer.useWithHandshake(new Promise(setImmediate), async () => {
@@ -786,7 +780,7 @@ describe('collectParcels', () => {
 
         await expect(
           mockServer.useWithHandshake(
-            asyncIterableToArray(iterableTake(client.collectParcels([nonceSigner], mode), 1)),
+            asyncIterableToArray(iterableTake(client.collectParcels([signer], mode), 1)),
             async () => {
               mockServer.close(WebSocketCode.VIOLATED_POLICY);
             },
@@ -804,9 +798,7 @@ describe('collectParcels', () => {
       const client = PoWebClient.initLocal();
 
       const parcelCollections = await mockServer.useWithHandshake(
-        asyncIterableToArray(
-          client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
-        ),
+        asyncIterableToArray(client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION)),
       );
 
       await expect(parcelCollections).toHaveLength(0);
@@ -816,9 +808,7 @@ describe('collectParcels', () => {
       const client = PoWebClient.initLocal();
 
       const parcelCollections = await mockServer.useWithHandshake(
-        asyncIterableToArray(
-          client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
-        ),
+        asyncIterableToArray(client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION)),
         async () => {
           await mockServer.sendParcelDelivery(new ArrayBuffer(0), 'id1');
         },
@@ -832,9 +822,7 @@ describe('collectParcels', () => {
       const client = PoWebClient.initLocal();
 
       const parcelCollections = await mockServer.useWithHandshake(
-        asyncIterableToArray(
-          client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
-        ),
+        asyncIterableToArray(client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION)),
         async () => {
           await mockServer.sendParcelDelivery(new ArrayBuffer(0), 'id1');
           await mockServer.sendParcelDelivery(new ArrayBuffer(0), 'id2');
@@ -849,9 +837,7 @@ describe('collectParcels', () => {
       const parcelSerialized = bufferToArray(Buffer.from('I am a parcel :wink: :wink:'));
 
       const parcelCollections = await mockServer.useWithHandshake(
-        asyncIterableToArray(
-          client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
-        ),
+        asyncIterableToArray(client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION)),
         async () => {
           await mockServer.sendParcelDelivery(parcelSerialized, 'id1');
         },
@@ -869,11 +855,14 @@ describe('collectParcels', () => {
         subjectPublicKey: nonceSigner2KeyPair.publicKey,
         validityEndDate: certificationPath.privateGateway.expiryDate,
       });
-      const nonceSigner2 = new Signer(nonceSigner2Certificate, nonceSigner2KeyPair.privateKey);
+      const nonceSigner2 = new ParcelCollectionHandshakeSigner(
+        nonceSigner2Certificate,
+        nonceSigner2KeyPair.privateKey,
+      );
 
       const parcelCollections = await mockServer.useWithHandshake(
         asyncIterableToArray(
-          client.collectParcels([nonceSigner, nonceSigner2], StreamingMode.CLOSE_UPON_COMPLETION),
+          client.collectParcels([signer, nonceSigner2], StreamingMode.CLOSE_UPON_COMPLETION),
         ),
         async () => {
           await mockServer.sendParcelDelivery(new ArrayBuffer(0), 'id1');
@@ -882,7 +871,7 @@ describe('collectParcels', () => {
 
       const trustedCertificates = parcelCollections[0].trustedCertificates;
       expect(trustedCertificates).toHaveLength(2);
-      expect(trustedCertificates[0].isEqual(nonceSigner.certificate)).toBeTrue();
+      expect(trustedCertificates[0].isEqual(signer.certificate)).toBeTrue();
       expect(trustedCertificates[1].isEqual(nonceSigner2.certificate)).toBeTrue();
     });
 
@@ -892,7 +881,7 @@ describe('collectParcels', () => {
 
       await mockServer.useWithHandshake(
         pipe(
-          client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
+          client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION),
           async (collections): Promise<void> => {
             for await (const collection of collections) {
               await collection.ack();
@@ -923,7 +912,7 @@ describe('collectParcels', () => {
       const error = await getPromiseRejection(
         mockServer.useWithHandshake(
           asyncIterableToArray(
-            client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
+            client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION),
           ),
           async () => {
             jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS - 100);
@@ -945,9 +934,7 @@ describe('collectParcels', () => {
       const client = PoWebClient.initLocal();
 
       await mockServer.useWithHandshake(
-        asyncIterableToArray(
-          client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
-        ),
+        asyncIterableToArray(client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION)),
         async () => {
           jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS - 100);
           mockServer.ping();
@@ -970,7 +957,7 @@ describe('collectParcels', () => {
         const error = await getPromiseRejection(
           mockServer.use(
             asyncIterableToArray(
-              client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
+              client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION),
             ),
             async () => {
               jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS + 100);
@@ -991,7 +978,7 @@ describe('collectParcels', () => {
 
         await Promise.all([
           asyncIterableToArray(
-            iterableTake(client.collectParcels([nonceSigner], StreamingMode.KEEP_ALIVE), 1),
+            iterableTake(client.collectParcels([signer], StreamingMode.KEEP_ALIVE), 1),
           ),
           (async () => {
             // First session won't get past the handshake:
@@ -1017,7 +1004,7 @@ describe('collectParcels', () => {
         const error = await getPromiseRejection(
           mockServer.useWithHandshake(
             asyncIterableToArray(
-              client.collectParcels([nonceSigner], StreamingMode.CLOSE_UPON_COMPLETION),
+              client.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION),
             ),
             async () => {
               jest.advanceTimersByTime(WEBSOCKET_PING_TIMEOUT_MS + 100);
@@ -1040,7 +1027,7 @@ describe('collectParcels', () => {
 
         await Promise.all([
           asyncIterableToArray(
-            iterableTake(client.collectParcels([nonceSigner], StreamingMode.KEEP_ALIVE), 1),
+            iterableTake(client.collectParcels([signer], StreamingMode.KEEP_ALIVE), 1),
           ),
           (async () => {
             await mockServer.useWithHandshake(new Promise(setImmediate), async () => {

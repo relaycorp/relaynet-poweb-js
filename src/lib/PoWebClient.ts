@@ -1,14 +1,14 @@
 import {
   derSerializePublicKey,
-  DETACHED_SIGNATURE_TYPES,
   GSCClient,
   HandshakeChallenge,
   HandshakeResponse,
   MAX_RAMF_MESSAGE_LENGTH,
   ParcelCollection,
+  ParcelCollectionHandshakeSigner,
   ParcelDelivery,
+  ParcelDeliverySigner,
   PrivateNodeRegistration,
-  Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import AbortController, { AbortSignal } from 'abort-controller';
@@ -174,8 +174,11 @@ export class PoWebClient implements GSCClient {
    * @param parcelSerialized
    * @param signer
    */
-  public async deliverParcel(parcelSerialized: ArrayBuffer, signer: Signer): Promise<void> {
-    const signature = await signer.sign(parcelSerialized, DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY);
+  public async deliverParcel(
+    parcelSerialized: ArrayBuffer,
+    signer: ParcelDeliverySigner,
+  ): Promise<void> {
+    const signature = await signer.sign(parcelSerialized);
     const countersignatureBase64 = Buffer.from(signature).toString('base64');
     const authorizationHeaderValue = `Relaynet-Countersignature ${countersignatureBase64}`;
     const response = await this.internalAxios.post('/parcels', parcelSerialized, {
@@ -201,26 +204,26 @@ export class PoWebClient implements GSCClient {
   /**
    * Collect parcels from the gateway.
    *
-   * @param nonceSigners The keys for the private nodes on whose behalf parcels are being collected
+   * @param signers The keys for the private nodes on whose behalf parcels are being collected
    * @param streamingMode
    * @param handshakeCallback Function to call after completing the handshake successfully
    */
   public async *collectParcels(
-    nonceSigners: readonly Signer[],
+    signers: readonly ParcelCollectionHandshakeSigner[],
     streamingMode: StreamingMode = StreamingMode.KEEP_ALIVE,
     handshakeCallback?: () => void,
   ): AsyncIterable<ParcelCollection> {
-    if (nonceSigners.length === 0) {
+    if (signers.length === 0) {
       throw new NonceSignerError('At least one nonce signer must be specified');
     }
 
     do {
-      yield* await this._collectParcels(nonceSigners, streamingMode, handshakeCallback);
+      yield* await this._collectParcels(signers, streamingMode, handshakeCallback);
     } while (streamingMode === StreamingMode.KEEP_ALIVE);
   }
 
   protected async *_collectParcels(
-    nonceSigners: readonly Signer[],
+    signers: readonly ParcelCollectionHandshakeSigner[],
     streamingMode: StreamingMode,
     handshakeCallback?: () => void,
   ): AsyncIterable<ParcelCollection> {
@@ -248,7 +251,7 @@ export class PoWebClient implements GSCClient {
     });
 
     try {
-      await this.doHandshake(ws, nonceSigners, pingTimeoutSignal);
+      await this.doHandshake(ws, signers, pingTimeoutSignal);
     } catch (err) {
       if (err instanceof ConnectionTimeoutError && streamingMode === StreamingMode.KEEP_ALIVE) {
         return;
@@ -278,7 +281,7 @@ export class PoWebClient implements GSCClient {
     async function* convertDeliveriesToCollections(
       deliveries: AsyncIterable<ParcelDelivery>,
     ): AsyncIterable<ParcelCollection> {
-      const trustedCertificates = nonceSigners.map((s) => s.certificate);
+      const trustedCertificates = signers.map((s) => s.certificate);
       for await (const delivery of deliveries) {
         yield new ParcelCollection(delivery.parcelSerialized, trustedCertificates, async () =>
           ws.send(delivery.deliveryId),
@@ -301,7 +304,7 @@ export class PoWebClient implements GSCClient {
 
   private async doHandshake(
     ws: WebSocket,
-    nonceSigners: readonly Signer[],
+    signers: readonly ParcelCollectionHandshakeSigner[],
     pingTimeoutSignal: AbortSignal,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -343,9 +346,7 @@ export class PoWebClient implements GSCClient {
           return;
         }
 
-        const nonceSignatures = await Promise.all(
-          nonceSigners.map((s) => s.sign(challenge.nonce, DETACHED_SIGNATURE_TYPES.NONCE)),
-        );
+        const nonceSignatures = await Promise.all(signers.map((s) => s.sign(challenge.nonce)));
         const response = new HandshakeResponse(nonceSignatures);
         ws.send(Buffer.from(response.serialize()));
 

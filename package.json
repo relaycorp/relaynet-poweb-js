@@ -42,7 +42,7 @@
   "dependencies": {
     "@relaycorp/relaynet-core": "^1.63.0",
     "abort-controller": "^3.0.0",
-    "axios": "^0.21.2",
+    "axios": "^0.27.2",
     "buffer-to-arraybuffer": "0.0.6",
     "it-pipe": "^1.1.0",
     "stream-to-it": "^0.2.4",
@@ -56,7 +56,7 @@
     "@types/jest": "^27.4.1",
     "@types/verror": "^1.10.5",
     "@types/ws": "^7.4.7",
-    "axios-mock-adapter": "^1.20.0",
+    "axios-mock-adapter": "^1.21.1",
     "del-cli": "^4.0.1",
     "jest": "^27.5.1",
     "jest-extended": "^2.0.0",

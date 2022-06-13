@@ -378,7 +378,7 @@ describe('deliverParcel', () => {
 
     await client.deliverParcel(parcelSerialized, signer);
 
-    const authorizationHeaderValue = mockAxios.history.post[0].headers.authorization;
+    const authorizationHeaderValue = mockAxios.history.post[0].headers!.authorization as string;
     expect(authorizationHeaderValue).toBeDefined();
     expect(authorizationHeaderValue).toStartWith('Relaynet-Countersignature ');
     const [, countersignatureBase64] = authorizationHeaderValue.split(' ', 2);

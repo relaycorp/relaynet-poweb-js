@@ -397,44 +397,44 @@ describe('deliverParcel', () => {
   test('HTTP 422 should throw a RefusedParcelError', async () => {
     mockAxios.onPost('/parcels').reply(422, null);
 
-    const error = await getRejection(client.deliverParcel(parcelSerialized, signer));
-
-    expect(error).toBeInstanceOf(RefusedParcelError);
-    expect(error.message).toEqual('Parcel was rejected');
+    await expect(client.deliverParcel(parcelSerialized, signer)).rejects.toThrowWithMessage(
+      RefusedParcelError,
+      'Parcel was rejected',
+    );
   });
 
   test('RefusedParcelError should include rejection reason if available', async () => {
     const message = 'Not enough postage';
     mockAxios.onPost('/parcels').reply(422, { message });
 
-    const error = await getRejection(client.deliverParcel(parcelSerialized, signer));
-
-    expect(error).toBeInstanceOf(RefusedParcelError);
-    expect(error.message).toEqual(`Parcel was rejected: ${message}`);
+    await expect(client.deliverParcel(parcelSerialized, signer)).rejects.toThrowWithMessage(
+      RefusedParcelError,
+      `Parcel was rejected: ${message}`,
+    );
   });
 
   test('HTTP 50X should throw a ServerError', async () => {
     mockAxios.onPost('/parcels').reply(500, null);
 
-    const error = await getRejection(client.deliverParcel(parcelSerialized, signer));
-
-    expect(error).toBeInstanceOf(ServerError);
-    expect(error.message).toEqual('Server was unable to get parcel (HTTP 500)');
+    await expect(client.deliverParcel(parcelSerialized, signer)).rejects.toThrowWithMessage(
+      ServerError,
+      'Server was unable to get parcel (HTTP 500)',
+    );
   });
 
   test('HTTP responses other than 20X/422/50X should throw errors', async () => {
     mockAxios.onPost('/parcels').reply(400, null);
 
-    const error = await getRejection(client.deliverParcel(parcelSerialized, signer));
-
-    expect(error).toBeInstanceOf(ParcelDeliveryError);
-    expect(error.message).toEqual('Could not deliver parcel (HTTP 400)');
+    await expect(client.deliverParcel(parcelSerialized, signer)).rejects.toThrowWithMessage(
+      ParcelDeliveryError,
+      'Could not deliver parcel (HTTP 400)',
+    );
   });
 
   test('Other client exceptions should be propagated', async () => {
     mockAxios.onPost('/parcels').networkError();
 
-    const error = await getRejection(client.deliverParcel(parcelSerialized, signer));
+    const error = await getPromiseRejection(client.deliverParcel(parcelSerialized, signer));
 
     expect(error).toHaveProperty('isAxiosError', true);
   });
@@ -1078,12 +1078,3 @@ describe('collectParcels', () => {
     }
   }
 });
-
-async function getRejection(promise: Promise<any>): Promise<Error> {
-  try {
-    await promise;
-  } catch (error) {
-    return error;
-  }
-  throw new Error('Expected promise to reject');
-}

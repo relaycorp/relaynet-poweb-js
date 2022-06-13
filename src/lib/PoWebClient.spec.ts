@@ -632,7 +632,7 @@ describe('collectParcels', () => {
       mockServer.useWithHandshake(
         asyncIterableToArray(client.collectParcels([signer])),
         async () => {
-          mockServer.close(WebSocketCode.VIOLATED_POLICY, closeReason);
+          mockServer.close(WebSocketCode.VIOLATED_POLICY, Buffer.from(closeReason));
         },
       ),
     );

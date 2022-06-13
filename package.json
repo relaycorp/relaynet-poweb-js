@@ -37,7 +37,7 @@
     "clean": "del-cli build test"
   },
   "engines": {
-    "node": ">=12"
+    "node": ">=14"
   },
   "dependencies": {
     "@relaycorp/relaynet-core": "^1.63.0",
@@ -50,9 +50,9 @@
     "ws": "^7.5.3"
   },
   "devDependencies": {
-    "@relaycorp/relaynet-testing": "^2.2.2",
+    "@relaycorp/relaynet-testing": "^2.2.18",
     "@relaycorp/shared-config": "^1.6.1",
-    "@relaycorp/ws-mock": "^4.2.0",
+    "@relaycorp/ws-mock": "^5.2.0",
     "@types/jest": "^27.4.1",
     "@types/verror": "^1.10.5",
     "@types/ws": "^7.4.7",
@@ -69,7 +69,7 @@
     "typescript": "^3.9.10"
   },
   "peerDependencies": {
-    "@relaycorp/relaynet-core": ">= 1.43.0 < 2"
+    "@relaycorp/relaynet-core": "^1.60.0"
   },
   "prettier": "@relaycorp/shared-config/.prettierrc.json",
   "publishConfig": {

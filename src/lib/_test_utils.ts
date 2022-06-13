@@ -1,10 +1,8 @@
-export async function getPromiseRejection<ErrorType extends Error>(
-  promise: Promise<any>,
-): Promise<ErrorType> {
+export async function getPromiseRejection(promise: Promise<any>): Promise<Error> {
   try {
     await promise;
   } catch (error) {
-    return error;
+    return error as Error;
   }
   throw new Error('Expected promise to throw');
 }

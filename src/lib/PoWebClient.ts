@@ -164,7 +164,7 @@ export class PoWebClient implements GSCClient {
     try {
       return await PrivateNodeRegistration.deserialize(registrationSerialized);
     } catch (exc) {
-      throw new ServerError(exc, 'Malformed registration received');
+      throw new ServerError(exc as Error, 'Malformed registration received');
     }
   }
 
@@ -270,7 +270,10 @@ export class PoWebClient implements GSCClient {
           yield ParcelDelivery.deserialize(bufferToArray(parcelDeliverySerialized));
         } catch (error) {
           stateManager.registerServerProtocolViolation(
-            new ParcelDeliveryError(error, 'Received malformed parcel delivery from the server'),
+            new ParcelDeliveryError(
+              error as Error,
+              'Received malformed parcel delivery from the server',
+            ),
             { code: WebSocketCode.CANNOT_ACCEPT, reason: 'Malformed parcel delivery' },
           );
           break;
@@ -339,7 +342,7 @@ export class PoWebClient implements GSCClient {
           ws.close(WebSocketCode.CANNOT_ACCEPT, 'Malformed handshake challenge');
           reject(
             new InvalidHandshakeChallengeError(
-              error,
+              error as Error,
               'Server sent a malformed handshake challenge',
             ),
           );

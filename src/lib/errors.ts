@@ -3,7 +3,7 @@
 import { VError } from 'verror';
 
 export abstract class PoWebError extends VError {
-  get name(): string {
+  override get name(): string {
     return this.constructor.name;
   }
 }

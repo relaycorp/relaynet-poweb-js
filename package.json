@@ -50,7 +50,7 @@
     "ws": "^7.5.3"
   },
   "devDependencies": {
-    "@relaycorp/relaynet-testing": "^2.2.19",
+    "@relaycorp/relaynet-testing": "^2.2.20",
     "@relaycorp/shared-config": "^1.8.0",
     "@relaycorp/ws-mock": "^5.2.2",
     "@types/jest": "^27.4.1",

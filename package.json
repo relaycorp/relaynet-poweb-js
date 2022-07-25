@@ -54,7 +54,7 @@
     "@relaycorp/shared-config": "^1.8.0",
     "@relaycorp/ws-mock": "^5.2.2",
     "@types/jest": "^27.4.1",
-    "@types/verror": "^1.10.5",
+    "@types/verror": "^1.10.6",
     "@types/ws": "^7.4.7",
     "axios-mock-adapter": "^1.21.1",
     "del-cli": "^4.0.1",

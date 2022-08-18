@@ -272,7 +272,8 @@ describe('registerNode', () => {
 
     expectedRegistration = new PrivateNodeRegistration(
       certificationPath.privateGateway,
-      certificationPath.publicGateway,
+      certificationPath.internetGateway,
+      'braavos.relaycorp.cloud',
     );
     expectedRegistrationSerialized = Buffer.from(await expectedRegistration.serialize());
   });
@@ -287,9 +288,7 @@ describe('registerNode', () => {
     expect(mockAxios.history.post).toHaveLength(1);
     expect(mockAxios.history.post[0].url).toEqual('/nodes');
     expect(mockAxios.history.post[0].headers).toHaveProperty('Content-Type', PNRR_CONTENT_TYPE);
-    expect(
-      Buffer.from(mockAxios.history.post[0].data).equals(Buffer.from(pnraSerialized)),
-    ).toBeTruthy();
+    expect(Buffer.from(mockAxios.history.post[0].data)).toEqual(Buffer.from(pnraSerialized));
   });
 
   test('An invalid response content type should be refused', async () => {
@@ -350,7 +349,7 @@ describe('deliverParcel', () => {
       certificationPath.privateGateway,
       nodeKeyPairs.privateGateway.privateKey,
     );
-    verifier = new ParcelDeliveryVerifier([certificationPath.publicGateway]);
+    verifier = new ParcelDeliveryVerifier([certificationPath.internetGateway]);
   });
 
   let client: PoWebClient;
